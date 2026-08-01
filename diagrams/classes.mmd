@@ -1,0 +1,223 @@
+classDiagram
+    class Main {
+        +main() void
+        -parse_args() Args
+    }
+
+    class DatasetLoader {
+        -dataset_dir: Path
+        +load_messages() list~Message~
+        +load_users() dict~str, User~
+        +load_groups() dict~str, Group~
+        +load_group_members() dict~(str,str), GroupMembership~
+        +load_business_accounts() dict~str, Business~
+        +load_user_business_history() dict~(str,str), UserBusinessHistory~
+        +load_message_history() list~Message~
+        +load_message_events() dict~str, list~MessageEvent~~
+        +load_images() dict~str, str~
+        +load_voice_notes() dict~str, str~
+        +load_daily_notification_summary() dict~(str,str), int~
+    }
+
+    class Message {
+        +message_id: str
+        +user_id: str
+        +conversation_type: str
+        +group_id: str
+        +business_id: str
+        +sender_user_id: str
+        +created_at: datetime
+        +message_text: str
+        +media_type: str
+        +media_id: str
+        +forwarded_count: int
+    }
+
+    class User {
+        +user_id: str
+        +do_not_disturb_window: str
+        +messages_opened_30d: int
+        +messages_replied_30d: int
+        +notifications_dismissed_30d: int
+        +messages_reported_30d: int
+        +is_in_dnd(ts: datetime) bool
+        +fatigue_score() float
+    }
+
+    class Group {
+        +group_id: str
+        +group_name: str
+        +group_type: str
+        +member_count: int
+        +admin_count: int
+        +messages_30d: int
+    }
+
+    class GroupMembership {
+        +group_id: str
+        +user_id: str
+        +role: str
+        +messages_read_30d: int
+        +replies_sent_30d: int
+        +notifications_dismissed_30d: int
+        +group_muted_by_user: bool
+        +is_admin() bool
+        +is_engaged() bool
+    }
+
+    class Business {
+        +business_id: str
+        +display_name: str
+        +verified: bool
+        +official_domain: str
+        +domain_used_by_sender: str
+        +account_age_days: int
+        +user_reports_30d: int
+        +domain_mismatch() bool
+        +trust_score() float
+    }
+
+    class UserBusinessHistory {
+        +user_id: str
+        +business_id: str
+        +why_user_knows_account: str
+        +allows_promotions: bool
+        +promotions_opted_out_at: datetime
+        +activity_count_180d: int
+        +messages_dismissed_30d: int
+        +has_real_relationship() bool
+        +opted_out() bool
+    }
+
+    class MessageEvent {
+        +user_id: str
+        +message_id: str
+        +message_opened: bool
+        +message_replied: bool
+        +notification_dismissed: bool
+        +muted_after_message: bool
+        +message_reported: bool
+    }
+
+    class MediaResolver {
+        -images: dict~str, str~
+        -voice_notes: dict~str, str~
+        +resolve_path(media_type: str, media_id: str) str
+        +extract_text(message: Message) str
+    }
+
+    class OCREngine {
+        +extract(image_path: str) str
+    }
+
+    class ASREngine {
+        +transcribe(audio_path: str) str
+    }
+
+    class EvidenceRetriever {
+        -history: list~Message~
+        -events: dict~str, list~MessageEvent~~
+        +find_similar(message: Message, derived_text: str) list~EvidenceMatch~
+        -score_similarity(a: Message, b: Message) float
+    }
+
+    class EvidenceMatch {
+        +message_id: str
+        +similarity: float
+        +user_reaction: ReactionSummary
+    }
+
+    class ReactionSummary {
+        +opened_rate: float
+        +dismissed_rate: float
+        +reported: bool
+        +muted_after: bool
+        +is_negative_pattern() bool
+    }
+
+    class SafetyGuard {
+        +sanitize(text: str) str
+        +detect_injection(text: str) bool
+        +detect_scam_signals(message: Message, business: Business) list~str~
+        +is_unsafe(message: Message, derived_text: str, business: Business) SafetyResult
+    }
+
+    class SafetyResult {
+        +is_unsafe: bool
+        +signals: list~str~
+        +message_type_hint: str
+    }
+
+    class FeatureBundle {
+        +message: Message
+        +user: User
+        +group: Group
+        +membership: GroupMembership
+        +business: Business
+        +biz_history: UserBusinessHistory
+        +derived_text: str
+        +evidence: list~EvidenceMatch~
+        +safety: SafetyResult
+        +daily_load: int
+    }
+
+    class RoutingEngine {
+        +route(features: FeatureBundle) RoutingDecision
+        -check_safety(features: FeatureBundle) RoutingDecision
+        -check_repetition(features: FeatureBundle) RoutingDecision
+        -check_urgency(features: FeatureBundle) RoutingDecision
+        -default_digest(features: FeatureBundle) RoutingDecision
+        -classify_message_type(features: FeatureBundle) str
+        -compute_confidence(features: FeatureBundle, rule: str) float
+    }
+
+    class RoutingDecision {
+        +action: str
+        +message_type: str
+        +reason: str
+        +confidence: float
+        +evidence_message_ids: list~str~
+    }
+
+    class OutputWriter {
+        +write(decisions: list~RoutingDecision~, out_path: Path) void
+    }
+
+    Main --> DatasetLoader
+    Main --> MediaResolver
+    Main --> EvidenceRetriever
+    Main --> SafetyGuard
+    Main --> RoutingEngine
+    Main --> OutputWriter
+
+    DatasetLoader --> Message
+    DatasetLoader --> User
+    DatasetLoader --> Group
+    DatasetLoader --> GroupMembership
+    DatasetLoader --> Business
+    DatasetLoader --> UserBusinessHistory
+    DatasetLoader --> MessageEvent
+
+    MediaResolver --> OCREngine
+    MediaResolver --> ASREngine
+
+    EvidenceRetriever --> EvidenceMatch
+    EvidenceMatch --> ReactionSummary
+    EvidenceRetriever ..> MessageEvent
+    EvidenceRetriever ..> Message
+
+    SafetyGuard --> SafetyResult
+    SafetyGuard ..> Business
+
+    FeatureBundle --> Message
+    FeatureBundle --> User
+    FeatureBundle --> Group
+    FeatureBundle --> GroupMembership
+    FeatureBundle --> Business
+    FeatureBundle --> UserBusinessHistory
+    FeatureBundle --> EvidenceMatch
+    FeatureBundle --> SafetyResult
+
+    RoutingEngine --> FeatureBundle
+    RoutingEngine --> RoutingDecision
+    OutputWriter --> RoutingDecision
