@@ -124,7 +124,14 @@ class SafetyGuard:
         Checks combined message_text + derived_text for credential
         requests, urgency/account-jeopardy pressure, and injection
         attempts, and checks the joined Business record (if any) for a
-        sender domain that doesn't match the business's official domain.
+        sender domain that doesn't match the business's official domain
+        AND is not verified (or has a high report count). Domain mismatch
+        alone is not a reliable signal: across business_accounts.csv,
+        verified businesses with a mismatch (e.g. a travel agency using a
+        link-shortener domain for marketing) top out at 7 user_reports_30d,
+        while unverified impersonation-style mismatches (e.g. a fake
+        "hdfcbank-kyc.in") mostly run 38-77 reports. Verification status is
+        the signal that actually separates the two groups.
         """
         combined_text = f"{message.message_text}\n{derived_text}".strip()
         signals: list[str] = []
@@ -139,7 +146,9 @@ class SafetyGuard:
             signals.append("urgency_account_pressure")
 
         if business is not None and business.domain_used_by_sender and business.official_domain:
-            if business.domain_used_by_sender.lower() != business.official_domain.lower():
+            domain_mismatch = business.domain_used_by_sender.lower() != business.official_domain.lower()
+            risky_mismatch = domain_mismatch and (not business.verified or business.user_reports_30d >= 20)
+            if risky_mismatch:
                 signals.append("business_domain_mismatch")
 
         if _matches_any(combined_text, _SPAM_MARKETING_PATTERNS):
