@@ -10,14 +10,23 @@ otherwise the message defaults to digest. Also assigns message_type, a
 short human-readable reason, a calibrated confidence, and the evidence
 message ids for the final output row.
 
-This module is pure rules: every decision is a deterministic function of
-the structured signals in FeatureBundle, with no model call anywhere in
-action selection. Two seams are marked "MODEL HOOK" below -- reason-text
-generation and message_type classification -- where a model could be
-layered in later purely as a swap of that one method's body. Nothing else
-in this file, and no caller in main.py, would need to change to add it,
-because action selection (the safety-critical output) stays rule-driven
-either way.
+This module is primarily rules, with one optional, additive model-assisted
+signal: RoutingEngine accepts an optional LLMReasoner (see llm.py). When
+present and available (GEMINI_API_KEY set, call budget remaining),
+_check_urgency asks it whether the message is genuinely time-relevant as
+an OR alongside the existing keyword check -- either signal alone is
+enough to proceed to the trust check, neither replaces the other. Without
+a reasoner (or once its call budget is exhausted), _check_urgency falls
+back to the keyword check alone, unchanged from before this hook existed.
+
+Two further seams are marked "MODEL HOOK" below -- reason-text generation
+and message_type classification -- where the same optional reasoner is
+tried first and rule-based logic is the fallback on any failure/absence.
+Nothing in main.py needs to change based on whether a reasoner is passed;
+route() and its cascade order are identical either way, and the model
+never gets a vote on mute vs. digest vs. notify beyond the additive
+urgency signal -- that stays the one deliberate, scoped exception to
+"action selection is rule-driven."
 """
 
 from __future__ import annotations
@@ -26,9 +35,24 @@ import re
 from dataclasses import dataclass, field
 from typing import Optional
 
+from llm import LLMReasoner
 from loaders import Business, Group, GroupMembership, Message, User, UserBusinessHistory
 from retrieval import EvidenceMatch
 from safety import SafetyResult
+
+_ALLOWED_MESSAGE_TYPES = [
+    "personal",
+    "urgent",
+    "event",
+    "payment",
+    "business_update",
+    "promotion",
+    "greeting",
+    "forward",
+    "spam",
+    "scam",
+    "unknown",
+]
 
 # Time-boxed deadline / immediate-action language. Distinguishes "this
 # needs a response in the next few minutes/hours" from generic chatter.
@@ -161,6 +185,10 @@ class RoutingEngine:
     not urgent, no negative history.
     """
 
+    def __init__(self, reasoner: Optional[LLMReasoner] = None) -> None:
+        """Store the optional model-assisted reasoner; None means fully rule-based, as before this hook existed."""
+        self._reasoner = reasoner
+
     def route(self, features: FeatureBundle) -> RoutingDecision:
         """Run the full cascade for one message and return its RoutingDecision."""
         decision = self._check_safety(features)
@@ -254,6 +282,16 @@ class RoutingEngine:
         muted: the content is still worth surfacing, but not by
         interrupting the user during quiet hours, per users.csv's
         do_not_disturb_window field.
+
+        When an LLMReasoner is configured and available, its urgency
+        judgment is combined with the keyword/business-update checks via
+        OR: any one of the three being true is sufficient to proceed to
+        the trust check. This recovers cases the keyword list cannot catch
+        (e.g. "Dad is not well, going to the clinic" -- an implied family
+        emergency with no deadline keyword) without ever letting the model
+        alone decide notify: the trust gate below still applies regardless
+        of which signal fired, so an untrusted/unknown sender still cannot
+        get a notify purely from the model's urgency call.
         """
         combined_text = f"{features.message.message_text}\n{features.derived_text}"
         has_urgency_language = _matches_urgency(combined_text)
@@ -262,7 +300,9 @@ class RoutingEngine:
             and self._has_real_business_relationship(features)
             and _matches_business_status_update(combined_text)
         )
-        if not has_urgency_language and not is_transactional_business_update:
+        model_says_urgent = self._model_assessed_urgent(features)
+
+        if not has_urgency_language and not is_transactional_business_update and not model_says_urgent:
             return None
 
         is_trusted = self._is_trusted_sender(features)
@@ -332,20 +372,40 @@ class RoutingEngine:
 
         return False
 
+    def _model_assessed_urgent(self, features: FeatureBundle) -> bool:
+        """
+        Return True only if the optional LLMReasoner is available and judges the message urgent.
+
+        Any absence of a usable signal (no reasoner configured, no API
+        key, call budget exhausted, network/parse failure) returns False
+        -- this is an additive OR input alongside the keyword checks, so
+        "no model opinion" must never itself block or force a result.
+        """
+        if self._reasoner is None:
+            return False
+        context = f"conversation_type={features.message.conversation_type}"
+        assessment = self._reasoner.assess_urgency(
+            features.message.message_text, features.derived_text, context
+        )
+        return assessment is not None and assessment.is_urgent
+
     # --- MODEL HOOK -----------------------------------------------------
-    # message_type is currently assigned by rule-of-thumb per cascade
-    # branch. A model given the same FeatureBundle (message text,
-    # derived_text, conversation_type, and which rule fired) could make a
-    # more nuanced choice among the allowed message_type values -- e.g.
-    # distinguishing "event" from "urgent" from "personal" within the
-    # urgency branch, which this method currently cannot do since it has
-    # no read on the message's actual subject matter. Swapping this
-    # method's body for a model call would not require any change to
-    # route(), FeatureBundle, or RoutingDecision.
+    # message_type is assigned by rule-of-thumb per cascade branch as the
+    # baseline; when an LLMReasoner is available, its classification is
+    # tried first and the rule-of-thumb above is the fallback on any
+    # failure/absence. The safety branch is a deliberate exception: it
+    # always uses SafetyResult.message_type_hint from the deterministic
+    # safety guard, never the model -- scam/spam classification on an
+    # already-unsafe message stays fully rule-driven, consistent with
+    # action selection never depending on the model for that branch.
     def _classify_message_type(self, features: FeatureBundle, rule: str) -> str:
-        """Assign a message_type consistent with the cascade branch that fired."""
+        """Assign a message_type consistent with the cascade branch that fired, model-assisted where safe."""
         if rule == "safety":
             return features.safety.message_type_hint or "scam"
+
+        model_type = self._model_classify_message_type(features)
+        if model_type is not None:
+            return model_type
 
         if rule == "repetition":
             if features.message.forwarded_count > 0:
@@ -366,17 +426,24 @@ class RoutingEngine:
             return "forward"
         return "personal"
 
+    def _model_classify_message_type(self, features: FeatureBundle) -> Optional[str]:
+        """Try the optional LLMReasoner for message_type; return None on any failure/absence to trigger the rule fallback."""
+        if self._reasoner is None:
+            return None
+        return self._reasoner.classify_message_type(
+            features.message.message_text, features.derived_text, _ALLOWED_MESSAGE_TYPES
+        )
+
     # --- MODEL HOOK -----------------------------------------------------
-    # reason is currently a fixed template per cascade branch, filled in
-    # with the specific signal names that fired (from SafetyResult.signals
-    # or the matched evidence). A model given the same FeatureBundle could
-    # write a more natural, message-specific sentence instead of reusing
-    # one of a handful of templates, which is what the evaluation
-    # criteria's "usefulness and consistency of reason" rewards at the
-    # margin. Swapping this method's body for a model call would not
-    # require any change to route(), FeatureBundle, or RoutingDecision.
+    # reason is a fixed template per cascade branch as the baseline; when
+    # an LLMReasoner is available, its generated sentence is tried first
+    # and the templates below are the fallback on any failure/absence.
+    # The safety branch is a deliberate exception, same reasoning as
+    # _classify_message_type: reasons for an already-unsafe message stay
+    # fully deterministic and signal-specific rather than model-authored,
+    # since this is the highest-stakes output category.
     def _build_reason(self, features: FeatureBundle, rule: str) -> str:
-        """Build a short human-readable reason string consistent with the cascade branch that fired."""
+        """Build a short human-readable reason string consistent with the cascade branch that fired, model-assisted where safe."""
         if rule == "safety":
             if "prompt_injection_attempt" in features.safety.signals:
                 return "The message tries to instruct the router, but the routing decision is based on the actual content and risk."
@@ -385,6 +452,10 @@ class RoutingEngine:
             if "credential_request" in features.safety.signals:
                 return "The message asks for sensitive verification details under urgency or account-risk pressure."
             return "The message shows signals consistent with a scam or unsafe request."
+
+        model_reason = self._model_build_reason(features, rule)
+        if model_reason is not None:
+            return model_reason
 
         if rule == "group_muted":
             return "The user has muted this group, so its messages should not interrupt them."
@@ -408,6 +479,13 @@ class RoutingEngine:
         if features.message.conversation_type == "business":
             return "A business is sending a non-urgent update that does not need to interrupt the user."
         return "The message is safe but not urgent enough to interrupt the user right now."
+
+    def _model_build_reason(self, features: FeatureBundle, rule: str) -> Optional[str]:
+        """Try the optional LLMReasoner for reason text; return None on any failure/absence to trigger the template fallback."""
+        if self._reasoner is None:
+            return None
+        context = f"cascade_branch={rule}, conversation_type={features.message.conversation_type}"
+        return self._reasoner.build_reason(features.message.message_text, features.derived_text, context)
 
     def _compute_confidence(self, features: FeatureBundle, rule: str) -> float:
         """

@@ -5,12 +5,15 @@ Resolves a message's media_id to an actual file path using images.csv or
 voice_notes.csv, then inspects the file under dataset/media/ since the CSVs
 only provide paths, not content. OCR and ASR are behind small abstract
 interfaces (OCREngine / ASREngine) so the extraction backend can be swapped
-without touching callers. The shipped implementations are local best-effort
-fallbacks (pytesseract for OCR, a no-op stub for ASR) that degrade to an
-empty string when the underlying engine or binary isn't available in the
-environment, so the pipeline always runs end-to-end. Swap in a stronger
-engine (e.g. a hosted vision/speech model) by implementing the same
-interface and passing it into MediaResolver.
+without touching callers. The shipped implementations are local, free, and
+API-key-independent: pytesseract for OCR and faster-whisper for ASR. Both
+degrade to an empty string when the underlying engine or binary isn't
+available in the environment, so the pipeline always runs end-to-end.
+
+Claude's Messages API does not accept raw audio content blocks (only text,
+image, PDF, and file references), so voice-note transcription cannot be
+done via the Claude API directly -- faster-whisper (a local, open
+speech-to-text model) is the working ASR path, independent of any API key.
 """
 
 from __future__ import annotations
@@ -66,18 +69,55 @@ class PytesseractOCREngine(OCREngine):
             return ""
 
 
+class WhisperASREngine(ASREngine):
+    """
+    Local ASR using faster-whisper (an optimized local Whisper implementation).
+
+    Runs fully offline once the model weights are cached; no API key or
+    network access is required at inference time. Uses the 'tiny' model for
+    fast CPU transcription suited to short voice notes. If faster-whisper
+    isn't installed, or transcription fails for any reason, returns ''
+    rather than raising, so a missing local dependency never crashes the
+    pipeline.
+    """
+
+    def __init__(self, model_size: str = "tiny") -> None:
+        """Lazily create the WhisperModel on first use so import failures don't crash construction."""
+        self._model_size = model_size
+        self._model = None
+
+    def _get_model(self):
+        """Return the cached WhisperModel, loading it on first call."""
+        if self._model is None:
+            from faster_whisper import WhisperModel
+
+            self._model = WhisperModel(self._model_size, device="cpu", compute_type="int8")
+        return self._model
+
+    def transcribe(self, audio_path: Path) -> str:
+        """Run local Whisper transcription on audio_path, returning '' if unavailable or it fails."""
+        try:
+            model = self._get_model()
+        except ImportError:
+            return ""
+
+        try:
+            segments, _info = model.transcribe(str(audio_path))
+            return " ".join(segment.text for segment in segments).strip()
+        except Exception:
+            return ""
+
+
 class NullASREngine(ASREngine):
     """
-    Placeholder ASR engine used until a real speech-to-text backend is wired in.
+    No-op ASR fallback used when no transcription backend should run at all.
 
-    No local speech-to-text package/binary is available in this
-    environment, so this always returns '' rather than raising. Replace
-    with a real ASREngine implementation (e.g. a hosted transcription
-    model) to get actual voice-note transcripts.
+    Always returns ''. Useful for tests or environments where even the
+    local Whisper dependency is unavailable/unwanted.
     """
 
     def transcribe(self, audio_path: Path) -> str:
-        """Always returns '' since no local transcription backend is wired in."""
+        """Always returns '' -- this engine never transcribes."""
         return ""
 
 
@@ -110,7 +150,7 @@ class MediaResolver:
         self._dataset = dataset
         self._dataset_dir = dataset_dir
         self._ocr_engine = ocr_engine or PytesseractOCREngine()
-        self._asr_engine = asr_engine or NullASREngine()
+        self._asr_engine = asr_engine or WhisperASREngine()
 
     def resolve_path(self, media_type: Optional[str], media_id: Optional[str]) -> Optional[Path]:
         """Return the absolute Path for a message's media_id, or None if there's no media."""
