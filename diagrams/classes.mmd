@@ -1,22 +1,17 @@
 classDiagram
-    class Main {
-        +main() void
-        -parse_args() Args
-    }
-
-    class DatasetLoader {
-        -dataset_dir: Path
-        +load_messages() list~Message~
-        +load_users() dict~str, User~
-        +load_groups() dict~str, Group~
-        +load_group_members() dict~(str,str), GroupMembership~
-        +load_business_accounts() dict~str, Business~
-        +load_user_business_history() dict~(str,str), UserBusinessHistory~
-        +load_message_history() list~Message~
-        +load_message_events() dict~str, list~MessageEvent~~
-        +load_images() dict~str, str~
-        +load_voice_notes() dict~str, str~
-        +load_daily_notification_summary() dict~(str,str), int~
+    %% code/loaders.py
+    class Dataset {
+        +messages: list~Message~
+        +users: dict~str, User~
+        +groups: dict~str, Group~
+        +group_members: dict~(str,str), GroupMembership~
+        +businesses: dict~str, Business~
+        +user_business_history: dict~(str,str), UserBusinessHistory~
+        +message_history: list~Message~
+        +message_events_by_message_id: dict~str, list~MessageEvent~~
+        +images: dict~str, str~
+        +voice_notes: dict~str, str~
+        +daily_notification_summary: dict~(str,str), DailyNotificationSummary~
     }
 
     class Message {
@@ -40,8 +35,6 @@ classDiagram
         +messages_replied_30d: int
         +notifications_dismissed_30d: int
         +messages_reported_30d: int
-        +is_in_dnd(ts: datetime) bool
-        +fatigue_score() float
     }
 
     class Group {
@@ -50,6 +43,7 @@ classDiagram
         +group_type: str
         +member_count: int
         +admin_count: int
+        +created_at: datetime
         +messages_30d: int
     }
 
@@ -57,36 +51,40 @@ classDiagram
         +group_id: str
         +user_id: str
         +role: str
+        +joined_at: datetime
+        +messages_sent_30d: int
         +messages_read_30d: int
         +replies_sent_30d: int
         +notifications_dismissed_30d: int
         +group_muted_by_user: bool
-        +is_admin() bool
-        +is_engaged() bool
     }
 
     class Business {
         +business_id: str
         +display_name: str
+        +brand_name: str
+        +category: str
         +verified: bool
         +official_domain: str
         +domain_used_by_sender: str
         +account_age_days: int
+        +messages_sent_30d: int
         +user_reports_30d: int
-        +domain_mismatch() bool
-        +trust_score() float
+        +domain_used_by_sender_age_days: int
     }
 
     class UserBusinessHistory {
         +user_id: str
         +business_id: str
         +why_user_knows_account: str
+        +last_activity_at: datetime
         +allows_promotions: bool
         +promotions_opted_out_at: datetime
         +activity_count_180d: int
+        +messages_opened_30d: int
         +messages_dismissed_30d: int
-        +has_real_relationship() bool
-        +opted_out() bool
+        +messages_replied_30d: int
+        +last_reply_at: datetime
     }
 
     class MessageEvent {
@@ -94,60 +92,130 @@ classDiagram
         +message_id: str
         +message_opened: bool
         +message_replied: bool
+        +reaction_time_minutes: int
         +notification_dismissed: bool
         +muted_after_message: bool
         +message_reported: bool
     }
 
-    class MediaResolver {
-        -images: dict~str, str~
-        -voice_notes: dict~str, str~
-        +resolve_path(media_type: str, media_id: str) str
-        +extract_text(message: Message) str
+    class DailyNotificationSummary {
+        +user_id: str
+        +date: str
+        +notifications_sent: int
+        +notifications_dismissed: int
     }
 
+    class loaders_module {
+        <<module functions>>
+        +load_messages(path) list~Message~
+        +load_users(path) dict~str, User~
+        +load_groups(path) dict~str, Group~
+        +load_group_members(path) dict
+        +load_business_accounts(path) dict~str, Business~
+        +load_user_business_history(path) dict
+        +load_message_events(path) dict~str, list~MessageEvent~~
+        +load_images(path) dict~str, str~
+        +load_voice_notes(path) dict~str, str~
+        +load_daily_notification_summary(path) dict
+        +load_dataset(dataset_dir) Dataset
+    }
+
+    %% code/media.py
     class OCREngine {
-        +extract(image_path: str) str
+        <<abstract>>
+        +extract(image_path: Path) str
     }
 
     class ASREngine {
-        +transcribe(audio_path: str) str
+        <<abstract>>
+        +transcribe(audio_path: Path) str
     }
 
-    class EvidenceRetriever {
-        -history: list~Message~
-        -events: dict~str, list~MessageEvent~~
-        +find_similar(message: Message, derived_text: str) list~EvidenceMatch~
-        -score_similarity(a: Message, b: Message) float
+    class PytesseractOCREngine {
+        +extract(image_path: Path) str
+    }
+
+    class WhisperASREngine {
+        -model_size: str
+        -model
+        +transcribe(audio_path: Path) str
+    }
+
+    class NullASREngine {
+        +transcribe(audio_path: Path) str
+    }
+
+    class MediaInspection {
+        +media_path: Path
+        +derived_text: str
+    }
+
+    class MediaResolver {
+        -dataset: Dataset
+        -dataset_dir: Path
+        -ocr_engine: OCREngine
+        -asr_engine: ASREngine
+        +resolve_path(media_type: str, media_id: str) Path
+        +inspect(message: Message) MediaInspection
+    }
+
+    %% code/retrieval.py
+    class ReactionSummary {
+        +opened_count: int
+        +replied_count: int
+        +dismissed_count: int
+        +muted_after_count: int
+        +reported_count: int
+        +total_events: int
+        +is_negative_pattern() bool
+        +is_positive_pattern() bool
     }
 
     class EvidenceMatch {
         +message_id: str
         +similarity: float
-        +user_reaction: ReactionSummary
+        +reaction: ReactionSummary
     }
 
-    class ReactionSummary {
-        +opened_rate: float
-        +dismissed_rate: float
-        +reported: bool
-        +muted_after: bool
-        +is_negative_pattern() bool
+    class EvidenceRetriever {
+        -events_by_message_id: dict
+        -history_by_user_id: dict~str, list~Message~~
+        -score_similarity(message, derived_text, candidate) float
+        +find_similar(message: Message, derived_text: str) list~EvidenceMatch~
     }
 
-    class SafetyGuard {
-        +sanitize(text: str) str
-        +detect_injection(text: str) bool
-        +detect_scam_signals(message: Message, business: Business) list~str~
-        +is_unsafe(message: Message, derived_text: str, business: Business) SafetyResult
-    }
-
+    %% code/safety.py
     class SafetyResult {
         +is_unsafe: bool
         +signals: list~str~
         +message_type_hint: str
     }
 
+    class SafetyGuard {
+        +sanitize(text: str) str
+        +detect_injection(text: str) bool
+        +detect_scam_signals(message, derived_text, business) list~str~
+        +is_unsafe(message, derived_text, business) SafetyResult
+    }
+
+    %% code/llm.py (optional, OFF by default)
+    class UrgencyAssessment {
+        +is_urgent: bool
+        +rationale: str
+    }
+
+    class LLMReasoner {
+        -model: str
+        -max_calls: int
+        -calls_made: int
+        -client
+        +available() bool
+        +assess_urgency(message_text, derived_text, context) UrgencyAssessment
+        +classify_message_type(message_text, derived_text, allowed_types) str
+        +build_reason(message_text, derived_text, context) str
+    }
+
+    %% code/router.py
     class FeatureBundle {
         +message: Message
         +user: User
@@ -158,56 +226,96 @@ classDiagram
         +derived_text: str
         +evidence: list~EvidenceMatch~
         +safety: SafetyResult
-        +daily_load: int
-    }
-
-    class RoutingEngine {
-        +route(features: FeatureBundle) RoutingDecision
-        -check_safety(features: FeatureBundle) RoutingDecision
-        -check_repetition(features: FeatureBundle) RoutingDecision
-        -check_urgency(features: FeatureBundle) RoutingDecision
-        -default_digest(features: FeatureBundle) RoutingDecision
-        -classify_message_type(features: FeatureBundle) str
-        -compute_confidence(features: FeatureBundle, rule: str) float
     }
 
     class RoutingDecision {
+        +message_id: str
         +action: str
         +message_type: str
         +reason: str
         +confidence: float
         +evidence_message_ids: list~str~
+        +evidence_field() str
     }
 
-    class OutputWriter {
-        +write(decisions: list~RoutingDecision~, out_path: Path) void
+    class RoutingEngine {
+        -reasoner: LLMReasoner
+        +route(features: FeatureBundle) RoutingDecision
+        -check_safety(features) RoutingDecision
+        -check_repetition(features) RoutingDecision
+        -check_urgency(features) RoutingDecision
+        -default_digest(features) RoutingDecision
+        -has_real_business_relationship(features) bool
+        -is_trusted_sender(features) bool
+        -is_in_quiet_hours(features) bool
+        -model_assessed_urgent(features) bool
+        -classify_message_type(features, rule) str
+        -model_classify_message_type(features) str
+        -build_reason(features, rule) str
+        -model_build_reason(features, rule) str
+        -compute_confidence(features, rule) float
+        -evidence_ids(features) list~str~
     }
 
-    Main --> DatasetLoader
-    Main --> MediaResolver
-    Main --> EvidenceRetriever
-    Main --> SafetyGuard
-    Main --> RoutingEngine
-    Main --> OutputWriter
+    %% code/main.py (functions, not a class -- shown as a facade for clarity)
+    class main_module {
+        <<module functions>>
+        +parse_args() Namespace
+        +build_features(message, dataset, resolver, retriever, guard) FeatureBundle
+        +route_messages(dataset, dataset_dir, engine) list~RoutingDecision~
+        +write_output(decisions, output_path) void
+        +main() void
+    }
 
-    DatasetLoader --> Message
-    DatasetLoader --> User
-    DatasetLoader --> Group
-    DatasetLoader --> GroupMembership
-    DatasetLoader --> Business
-    DatasetLoader --> UserBusinessHistory
-    DatasetLoader --> MessageEvent
+    %% code/evaluation/main.py
+    class evaluation_module {
+        <<module functions>>
+        +parse_args() Namespace
+        +row_to_message(row) Message
+        +main() void
+    }
 
+    main_module ..> loaders_module : load_dataset()
+    main_module --> MediaResolver
+    main_module --> EvidenceRetriever
+    main_module --> SafetyGuard
+    main_module --> RoutingEngine
+    main_module --> LLMReasoner : if --use-llm
+    main_module --> FeatureBundle
+    main_module --> RoutingDecision
+
+    evaluation_module ..> main_module : reuses build_features()
+    evaluation_module --> RoutingEngine
+
+    loaders_module --> Dataset
+    Dataset --> Message
+    Dataset --> User
+    Dataset --> Group
+    Dataset --> GroupMembership
+    Dataset --> Business
+    Dataset --> UserBusinessHistory
+    Dataset --> MessageEvent
+    Dataset --> DailyNotificationSummary
+
+    MediaResolver --> Dataset
+    MediaResolver --> MediaInspection
     MediaResolver --> OCREngine
     MediaResolver --> ASREngine
+    PytesseractOCREngine ..|> OCREngine
+    WhisperASREngine ..|> ASREngine
+    NullASREngine ..|> ASREngine
 
+    EvidenceRetriever --> Dataset
     EvidenceRetriever --> EvidenceMatch
     EvidenceMatch --> ReactionSummary
-    EvidenceRetriever ..> MessageEvent
-    EvidenceRetriever ..> Message
 
     SafetyGuard --> SafetyResult
     SafetyGuard ..> Business
+
+    RoutingEngine --> FeatureBundle
+    RoutingEngine --> RoutingDecision
+    RoutingEngine --> LLMReasoner
+    LLMReasoner --> UrgencyAssessment
 
     FeatureBundle --> Message
     FeatureBundle --> User
@@ -217,7 +325,3 @@ classDiagram
     FeatureBundle --> UserBusinessHistory
     FeatureBundle --> EvidenceMatch
     FeatureBundle --> SafetyResult
-
-    RoutingEngine --> FeatureBundle
-    RoutingEngine --> RoutingDecision
-    OutputWriter --> RoutingDecision

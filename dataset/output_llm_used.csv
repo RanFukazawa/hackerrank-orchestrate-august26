@@ -1,0 +1,111 @@
+message_id,action,message_type,reason,confidence,evidence_message_ids
+msg_023,digest,payment,The message is routed to the default branch because its content is a standard business notification regarding an account update.,0.78,message_0243;message_0102
+msg_091,mute,scam,The message asks for sensitive verification details under urgency or account-risk pressure.,0.88,message_0238;message_0381
+msg_090,digest,personal,The message is routed to the default branch because it is a personal conversation from an unrecognized sender.,0.78,none
+msg_048,mute,forward,Similar messages from this sender were previously reported by the user.,0.8800000000000001,message_0151;message_0152
+msg_040,mute,forward,"The user has muted this group, so its messages should not interrupt them.",0.9,message_0136;message_0135
+msg_075,digest,business_update,A business is sending a non-urgent update that does not need to interrupt the user.,0.78,message_0206;message_0205
+msg_005,digest,personal,The message is safe but not urgent enough to interrupt the user right now.,0.78,message_0065;message_0049
+msg_104,mute,greeting,The sender has a pattern of repeated messages that the user usually ignores or dismisses.,0.8300000000000001,message_0224;message_0383
+msg_069,mute,forward,"The user has muted this group, so its messages should not interrupt them.",0.9,message_0177;message_0193
+msg_107,digest,forward,The message is safe but not urgent enough to interrupt the user right now.,0.78,message_0213;message_0235
+msg_070,mute,scam,The message asks for sensitive verification details under urgency or account-risk pressure.,0.88,message_0369;message_0213
+msg_003,notify,business_update,A verified business is sending a time-sensitive update relevant to the user's recent activity.,0.85,message_0400;message_0031
+msg_099,digest,personal,The message is safe but not urgent enough to interrupt the user right now.,0.78,message_0227;message_0249
+msg_008,digest,business_update,A business is sending a non-urgent update that does not need to interrupt the user.,0.78,message_0296;message_0072
+msg_092,digest,business_update,A business is sending a non-urgent update that does not need to interrupt the user.,0.78,message_0346
+msg_060,digest,personal,The message is safe but not urgent enough to interrupt the user right now.,0.78,message_0284;message_0176
+msg_004,notify,business_update,A verified business is sending a time-sensitive update relevant to the user's recent activity.,0.85,message_0246;message_0245
+msg_030,mute,forward,"The user has muted this group, so its messages should not interrupt them.",0.9,message_0335;message_0115
+msg_045,notify,urgent,The sender is trusted and the message contains a direct deadline or action needed soon.,0.85,message_0146;message_0145
+msg_052,mute,scam,"The sender's domain does not match the business's official domain, a strong scam signal.",0.85,message_0208;message_0207
+msg_009,mute,greeting,"The user has muted this group, so its messages should not interrupt them.",0.9,message_0074;message_0073
+msg_071,digest,personal,The message is safe but not urgent enough to interrupt the user right now.,0.78,message_0197;message_0198
+msg_016,mute,forward,Similar messages from this sender were previously reported by the user.,0.8800000000000001,message_0024;message_0201
+msg_065,digest,business_update,A business is sending a non-urgent update that does not need to interrupt the user.,0.78,message_0261;message_0260
+msg_038,mute,forward,The sender has a pattern of repeated messages that the user usually ignores or dismisses.,0.8300000000000001,message_0131;message_0132
+msg_086,digest,business_update,A business is sending a non-urgent update that does not need to interrupt the user.,0.78,message_0222
+msg_014,mute,promotion,The sender has a pattern of repeated messages that the user usually ignores or dismisses.,0.8300000000000001,message_0258;message_0018
+msg_094,mute,promotion,The sender has a pattern of repeated messages that the user usually ignores or dismisses.,0.8300000000000001,message_0356
+msg_029,digest,forward,The message is safe but not urgent enough to interrupt the user right now.,0.78,message_0113;message_0332
+msg_105,mute,forward,The sender has a pattern of repeated messages that the user usually ignores or dismisses.,0.8300000000000001,message_0373;message_0233
+msg_002,notify,urgent,The sender is trusted and the message contains a direct deadline or action needed soon.,0.85,message_0003;message_0041
+msg_010,digest,business_update,A business is sending a non-urgent update that does not need to interrupt the user.,0.78,message_0011;message_0242
+msg_078,mute,forward,"The user has muted this group, so its messages should not interrupt them.",0.9,message_0211;message_0212
+msg_013,mute,greeting,The sender has a pattern of repeated messages that the user usually ignores or dismisses.,0.8300000000000001,message_0081;message_0082
+msg_018,mute,forward,Similar messages from this sender were previously reported by the user.,0.8800000000000001,message_0091;message_0092
+msg_044,mute,scam,The message asks for sensitive verification details under urgency or account-risk pressure.,0.88,message_0143;message_0144
+msg_032,notify,urgent,A trusted group admin sent a time-sensitive update that should interrupt the user.,0.87,message_0119;message_0285
+msg_106,notify,urgent,The sender is trusted and the message contains a direct deadline or action needed soon.,0.85,message_0376;message_0234
+msg_006,digest,personal,The message is safe but not urgent enough to interrupt the user right now.,0.78,message_0097;message_0067
+msg_109,mute,greeting,Similar messages from this sender were previously reported by the user.,0.8800000000000001,message_0151;message_0152
+msg_108,mute,scam,"The sender's domain does not match the business's official domain, a strong scam signal.",0.88,message_0094;message_0093
+msg_019,mute,scam,"The sender's domain does not match the business's official domain, a strong scam signal.",0.85,message_0277;message_0094
+msg_088,mute,greeting,"The user has muted this group, so its messages should not interrupt them.",0.9,message_0224;message_0232
+msg_056,mute,greeting,"The user has muted this group, so its messages should not interrupt them.",0.9,message_0168;message_0167
+msg_027,digest,business_update,A business is sending a non-urgent update that does not need to interrupt the user.,0.78,message_0272;message_0033
+msg_050,digest,business_update,A business is sending a non-urgent update that does not need to interrupt the user.,0.78,message_0279;message_0278
+msg_083,digest,personal,The message is safe but not urgent enough to interrupt the user right now.,0.78,message_0219
+msg_063,mute,greeting,Similar messages from this sender were previously reported by the user.,0.8800000000000001,message_0181;message_0182
+msg_033,digest,personal,The message is safe but not urgent enough to interrupt the user right now.,0.78,message_0121;message_0122
+msg_061,mute,forward,"The user has muted this group, so its messages should not interrupt them.",0.9,message_0177;message_0193
+msg_020,mute,forward,The sender has a pattern of repeated messages that the user usually ignores or dismisses.,0.8300000000000001,message_0096;message_0095
+msg_017,mute,greeting,"The user has muted this group, so its messages should not interrupt them.",0.9,message_0089;message_0090
+msg_058,mute,forward,"The user has muted this group, so its messages should not interrupt them.",0.9,message_0039;message_0040
+msg_026,mute,scam,"The sender's domain does not match the business's official domain, a strong scam signal.",0.88,message_0032;message_0107
+msg_047,digest,personal,The message is safe but not urgent enough to interrupt the user right now.,0.78,message_0149;message_0150
+msg_046,mute,scam,The message asks for sensitive verification details under urgency or account-risk pressure.,0.88,message_0148;message_0147
+msg_042,notify,urgent,The sender is trusted and the message contains a direct deadline or action needed soon.,0.85,message_0140;message_0139
+msg_079,mute,scam,The message asks for sensitive verification details under urgency or account-risk pressure.,0.88,message_0369;message_0023
+msg_098,digest,personal,The message is safe but not urgent enough to interrupt the user right now.,0.78,message_0226;message_0359
+msg_037,notify,urgent,A trusted group admin sent a time-sensitive update that should interrupt the user.,0.87,message_0001;message_0029
+msg_007,digest,personal,The message is safe but not urgent enough to interrupt the user right now.,0.78,message_0070;message_0069
+msg_085,mute,scam,"The sender's domain does not match the business's official domain, a strong scam signal.",0.88,message_0221
+msg_001,notify,urgent,The sender is trusted and the message contains a direct deadline or action needed soon.,0.85,message_0057;message_0240
+msg_021,notify,urgent,A trusted group admin sent a time-sensitive update that should interrupt the user.,0.87,message_0098;message_0068
+msg_028,mute,promotion,The sender has a pattern of repeated messages that the user usually ignores or dismisses.,0.8300000000000001,message_0034;message_0112
+msg_012,mute,forward,The sender has a pattern of repeated messages that the user usually ignores or dismisses.,0.8300000000000001,message_0079;message_0247
+msg_064,mute,forward,Similar messages from this sender were previously reported by the user.,0.8800000000000001,message_0201;message_0087
+msg_103,digest,personal,The message is safe but not urgent enough to interrupt the user right now.,0.78,message_0065;message_0382
+msg_031,notify,urgent,A trusted group admin sent a time-sensitive update that should interrupt the user.,0.87,message_0249;message_0117
+msg_057,digest,personal,The message is safe but not urgent enough to interrupt the user right now.,0.78,message_0059;message_0169
+msg_087,mute,greeting,"The user has muted this group, so its messages should not interrupt them.",0.9,message_0223;message_0358
+msg_067,digest,personal,The message is safe but not urgent enough to interrupt the user right now.,0.78,message_0098;message_0068
+msg_039,digest,personal,The message is safe but not urgent enough to interrupt the user right now.,0.78,message_0364;message_0051
+msg_082,digest,personal,The message is safe but not urgent enough to interrupt the user right now.,0.78,message_0218;message_0397
+msg_066,mute,forward,The sender has a pattern of repeated messages that the user usually ignores or dismisses.,0.8300000000000001,message_0257;message_0402
+msg_049,digest,business_update,A business is sending a non-urgent update that does not need to interrupt the user.,0.78,message_0154;message_0291
+msg_015,digest,personal,The message is safe but not urgent enough to interrupt the user right now.,0.78,message_0199;message_0085
+msg_051,mute,forward,The sender has a pattern of repeated messages that the user usually ignores or dismisses.,0.8300000000000001,message_0257;message_0402
+msg_097,digest,personal,The message is safe but not urgent enough to interrupt the user right now.,0.78,message_0359;message_0167
+msg_089,digest,personal,The message is safe but not urgent enough to interrupt the user right now.,0.78,none
+msg_053,digest,forward,The message is safe but not urgent enough to interrupt the user right now.,0.78,message_0253;message_0411
+msg_059,mute,greeting,The sender has a pattern of repeated messages that the user usually ignores or dismisses.,0.8300000000000001,message_0053;message_0174
+msg_024,mute,forward,The sender has a pattern of repeated messages that the user usually ignores or dismisses.,0.8300000000000001,message_0257;message_0402
+msg_072,digest,forward,The message is safe but not urgent enough to interrupt the user right now.,0.78,message_0199;message_0085
+msg_036,mute,scam,"The sender's domain does not match the business's official domain, a strong scam signal.",0.85,message_0283;message_0127
+msg_076,mute,scam,"The sender's domain does not match the business's official domain, a strong scam signal.",0.85,message_0208;message_0207
+msg_055,digest,personal,The message is safe but not urgent enough to interrupt the user right now.,0.78,message_0166;message_0165
+msg_102,notify,urgent,The sender is trusted and the message contains a direct deadline or action needed soon.,0.85,message_0371;message_0230
+msg_080,notify,urgent,A trusted group admin sent a time-sensitive update that should interrupt the user.,0.87,message_0216;message_0130
+msg_093,digest,business_update,A business is sending a non-urgent update that does not need to interrupt the user.,0.78,message_0398;message_0349
+msg_034,mute,forward,"The user has muted this group, so its messages should not interrupt them.",0.9,message_0013;message_0123
+msg_035,digest,business_update,A business is sending a non-urgent update that does not need to interrupt the user.,0.78,message_0281;message_0125
+msg_101,digest,personal,The message is safe but not urgent enough to interrupt the user right now.,0.78,message_0370;message_0229
+msg_041,digest,business_update,A business is sending a non-urgent update that does not need to interrupt the user.,0.78,message_0137;message_0138
+msg_011,mute,forward,"The user has muted this group, so its messages should not interrupt them.",0.9,message_0123;message_0171
+msg_110,mute,forward,Similar messages from this sender were previously reported by the user.,0.8800000000000001,message_0238;message_0381
+msg_095,mute,scam,"The message tries to instruct the router, but the routing decision is based on the actual content and risk.",0.88,message_0201;message_0087
+msg_074,mute,forward,"The user has muted this group, so its messages should not interrupt them.",0.9,message_0203;message_0223
+msg_073,mute,forward,Similar messages from this sender were previously reported by the user.,0.8800000000000001,message_0201;message_0087
+msg_054,mute,greeting,Similar messages from this sender were previously reported by the user.,0.8800000000000001,message_0163;message_0164
+msg_068,digest,personal,The message is safe but not urgent enough to interrupt the user right now.,0.78,message_0191;message_0192
+msg_100,notify,urgent,The sender is trusted and the message contains a direct deadline or action needed soon.,0.85,message_0362;message_0228
+msg_062,digest,forward,The message is safe but not urgent enough to interrupt the user right now.,0.78,message_0043;message_0129
+msg_096,digest,personal,The message is safe but not urgent enough to interrupt the user right now.,0.78,none
+msg_043,notify,urgent,A trusted group admin sent a time-sensitive update that should interrupt the user.,0.87,message_0097;message_0067
+msg_077,digest,personal,The message is safe but not urgent enough to interrupt the user right now.,0.78,message_0051;message_0403
+msg_081,digest,personal,The message is safe but not urgent enough to interrupt the user right now.,0.78,message_0217;message_0105
+msg_025,notify,business_update,A verified business is sending a time-sensitive update relevant to the user's recent activity.,0.85,message_0239;message_0004
+msg_084,mute,promotion,The sender has a pattern of repeated messages that the user usually ignores or dismisses.,0.8300000000000001,message_0220
+msg_022,mute,greeting,The sender has a pattern of repeated messages that the user usually ignores or dismisses.,0.8300000000000001,message_0099;message_0100
