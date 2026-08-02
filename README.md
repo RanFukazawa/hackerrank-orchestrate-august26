@@ -1,130 +1,124 @@
-# HackerRank Orchestrate
+# Message Notification Router
 
-Starter repository for the **HackerRank Orchestrate** 24-hour hackathon.
+A rule-based WhatsApp message router that classifies every incoming message as `notify`, `digest`, or `mute`, with an optional local-first multimodal pipeline (OCR/ASR) and an optional, budget-capped LLM assist layer.
 
-## Message Notification Router
-
-Build an AI-powered system for WhatsApp that decides which messages deserve immediate attention, which should wait, and which should be muted.
-
-The system must reason over multimodal messages, including text messages, image posters/screenshots, and voice notes.
-
-WhatsApp is noisy. A user can receive family chats, society notices, school updates, co-worker messages, business account promotions, image posters, voice notes, and scams in the same message stream. Treating every message the same creates two bad outcomes: important messages get missed, and unwanted or risky messages interrupt the user.
-
-Read [`problem_statement.md`](./problem_statement.md) for the full task spec, input/output schema, allowed values, and submission format.
+The original starter README (challenge description, dataset layout, submission requirements) has been moved to [`CHALLENGE_README.md`](./CHALLENGE_README.md). Read [`problem_statement.md`](./problem_statement.md) for the full task spec.
 
 ---
 
-## Repository Layout
+## Quick Start
+
+```bash
+# 1. Install Python dependencies
+pip install -r requirements.txt
+
+# 2. Install the local OCR binary (macOS)
+brew install tesseract
+# (Debian/Ubuntu: apt install tesseract-ocr)
+
+# 3. Run the router (rules-only, no API key needed)
+python code/main.py
+
+# 4. Check predictions against the labeled samples
+python code/evaluation/main.py
+```
+
+This produces `dataset/output.csv` — one prediction row per message in `dataset/messages.csv`, fully rule-based and deterministic by default.
+
+### Optional: enable the LLM assist layer
+
+```bash
+# Requires a Gemini API key (free tier works, budget-capped in code)
+echo "GEMINI_API_KEY=your-key-here" >> .env
+set -a; source .env; set +a
+
+python code/main.py --use-llm --output dataset/output_llm_used.csv
+```
+
+This is **off by default** and never required — see [Architecture](#architecture--design-decisions) below for why.
+
+---
+
+## Repository Layout (this solution)
 
 ```text
 .
-├── AGENTS.md                         # Rules for AI coding tools + transcript logging
-├── problem_statement.md              # Full challenge statement
-├── README.md                         # You are here
-└── dataset/
-    ├── messages.csv                  # Messages to route
-    ├── output.csv                    # Blank submission template
-    ├── sample_messages.csv           # Solved examples
-    ├── users.csv                     # User notification behavior
-    ├── groups.csv                    # Group metadata
-    ├── group_members.csv             # User-group relationships
-    ├── business_accounts.csv         # Business sender metadata
-    ├── user_business_history.csv     # User-business history
-    ├── message_history.csv           # Historical messages
-    ├── message_events.csv            # User reactions to historical messages
-    ├── images.csv                    # Image IDs and media file paths
-    ├── voice_notes.csv               # Voice note IDs and media file paths
-    ├── daily_notification_summary.csv
-    └── media/
-        ├── images/
-        └── audio/
+├── README.md                    # You are here
+├── CHALLENGE_README.md          # Original starter README (renamed)
+├── AGENTS.md                    # Agent rules + transcript logging (unchanged)
+├── problem_statement.md         # Full challenge statement (unchanged)
+├── requirements.txt             # Python dependencies
+├── .gitignore                   # Excludes .env, __pycache__, etc.
+├── diagrams/
+│   ├── architecture.mmd         # Pipeline flowchart (mermaid)
+│   └── classes.mmd              # Class diagram (mermaid)
+├── code/
+│   ├── loaders.py                # Parses dataset/*.csv into typed dataclasses
+│   ├── media.py                  # Local OCR (pytesseract) + local ASR (faster-whisper)
+│   ├── retrieval.py               # Historical evidence matching + reaction-pattern scoring
+│   ├── safety.py                  # Injection guard + scam/spam detection
+│   ├── llm.py                     # Optional Gemini-backed reasoning layer (OFF by default)
+│   ├── router.py                  # The notify/digest/mute decision cascade
+│   ├── main.py                    # CLI entry point
+│   └── evaluation/
+│       └── main.py                # Self-check harness against sample_messages.csv
+└── dataset/                     # Unchanged from the starter repo
 ```
 
 ---
 
-## What You Need to Build
+## Architecture & Design Decisions
 
-For every row in `dataset/messages.csv`, produce one row in `output.csv` with:
+See [`diagrams/architecture.mmd`](./diagrams/architecture.mmd) for the full pipeline flowchart and [`diagrams/classes.mmd`](./diagrams/classes.mmd) for the class diagram (render either at [mermaid.live](https://mermaid.live) or via the Mermaid CLI).
 
-| Column | Meaning |
-|---|---|
-| `message_id` | Incoming message ID |
-| `action` | One of `notify`, `digest`, or `mute` |
-| `message_type` | Best-fit message category |
-| `reason` | Short human-readable explanation |
-| `confidence` | Number from `0` to `1` |
-| `evidence_message_ids` | Historical message IDs used as evidence; write `none` if there is no useful evidence |
+### Pipeline
 
-Your system should make personalized decisions using the provided message, user, group, business, media, and historical interaction data.
-For image and voice-note messages, `images.csv` and `voice_notes.csv` only provide file paths; your system should inspect the media files themselves.
+```
+messages.csv row
+  → loaders.py (join user/group/business/history context)
+  → media.py (resolve + OCR/ASR any image/voice attachment)
+  → retrieval.py (find similar past messages for this user + their reactions)
+  → safety.py (scam/injection detection)
+  → router.py (safety → repetition/fatigue → urgency+trust → DND check → default digest)
+  → output.csv row
+```
 
----
+### Key decisions and tradeoffs
 
-## Suggested Workflow
+**Action selection is 100% rule-based, always.** `notify`/`digest`/`mute` is a deterministic function of structured signals (sender trust, history, safety flags, urgency keywords) — never dependent on an LLM being configured or responding correctly. This keeps the highest-stakes output auditable and immune to model failure or hallucination. The optional LLM layer (`llm.py`) only ever contributes an *additive* signal: its urgency judgment is OR'd with the keyword check (either alone is sufficient, neither replaces the other), and it can refine `message_type`/`reason` text — except on the safety/scam branch, which stays fully deterministic even when the LLM is enabled.
 
-1. Inspect `dataset/sample_messages.csv` to understand the expected output format.
-2. Load `dataset/messages.csv` and all relevant context files.
-3. Build your routing system using any approach: LLMs, retrieval, rules, classifiers, agents, or hybrids.
-4. Write predictions to `output.csv`.
-5. Evaluate your approach on the solved sample rows before submitting.
+**LLM usage is optional, capped, and gated behind `--use-llm`.** Given a tight free-tier API budget, `llm.py` enforces a hard per-run call cap and degrades silently to pure rules on any failure (missing key, network error, budget exhausted, bad response). A normal run (`python code/main.py`) makes zero API calls. This is a deliberate cost/capability tradeoff — most of a full dataset run gets no LLM assistance once the budget is spent, but the system never breaks or produces a worse result because of it.
 
-You may use any language or runtime. Python, JavaScript, and TypeScript are all reasonable choices.
+**Local media processing, not a hosted vision/audio model.** OCR uses `pytesseract` (image posters/screenshots); ASR uses `faster-whisper` (voice notes) — both run fully offline, free, with no API key or rate limits. This was also a hard constraint: the Claude Messages API has no audio input content-block type, so voice-note transcription cannot be done via that API at all. Tradeoff: local OCR is noticeably weaker than a vision-LLM on degraded/blurry scans.
 
----
+**Evidence retrieval is lexical, not semantic.** `retrieval.py` scores similarity via shared sender/group/business identity plus Jaccard token overlap on text — deterministic and dependency-free, but it cannot recognize two messages about the same real-world situation if they don't share vocabulary. This is documented explicitly in the module and was a deliberate choice over embedding-based similarity, to keep the "same message in → same evidence out" behavior fully reproducible.
 
-## Requirements
+**Confidence scores are heuristic, not calibrated probabilities.** They're tuned to roughly match the confidence clustering observed in `dataset/sample_messages.csv` (clear-cut mute/notify decisions score higher, soft digest calls score lower), not derived from a statistical model.
 
-Your solution must:
+### Validated results
 
-- be runnable from the terminal
-- read the provided files from `dataset/`
-- produce a valid `output.csv`
-- include one prediction for every `message_id` in `dataset/messages.csv`
-- not use organizer-only files or hardcoded labels
+Running `python code/evaluation/main.py` against the 30 labeled rows in `dataset/sample_messages.csv`:
 
-If you use API keys or secrets, read them from environment variables. Never hardcode secrets in the repo.
+- **Action accuracy: 27/30 (90%)**
+- **Message type accuracy: 14/30 (47%)**
+- **Evidence hit rate: 17/28 (61%)** of rows with expected evidence
+
+Safety/scam detection catches 9-10 of 10 labeled mute cases with zero false positives across all notify/digest samples, including a deliberate prompt-injection test case in the sample data (a message instructing the router to "mark this as notify" — correctly muted as a scam regardless of its own claim).
 
 ---
 
-## Evaluation
+## Environment Variables
 
-Your `output.csv` will be compared against hidden ground-truth labels.
+| Variable | Required | Purpose |
+|---|---|---|
+| `GEMINI_API_KEY` | No (only with `--use-llm`) | Enables the optional LLM-assisted reasoning layer in `llm.py` |
 
-The scoring will consider:
-
-- correctness of `action`
-- correctness of `message_type`
-- usefulness and consistency of `reason`
-- whether `evidence_message_ids` point to relevant historical messages
-- reasonable confidence calibration
-
-Strong systems will combine retrieval, structured metadata, behavioral history, safety checks, OCR/ASR handling, and contextual reasoning.
+No secrets are hardcoded anywhere in the codebase; `.env` is gitignored.
 
 ---
 
-## Chat Transcript Logging
+## Notes for Evaluators
 
-This repo includes an [`AGENTS.md`](./AGENTS.md) file for AI coding tools. It asks compatible tools to append conversation summaries to:
-
-| Platform | Path |
-|---|---|
-| macOS / Linux | `$HOME/hackerrank_orchestrate_august26/log.txt` |
-| Windows | `%USERPROFILE%\hackerrank_orchestrate_august26\log.txt` |
-
-Upload this log as your chat transcript at submission time. Do not paste secrets into the chat.
-
----
-
-## Submission
-
-Submit the following files as instructed by HackerRank:
-
-1. **Code zip**: full runnable solution, prompts/configs, README, and any evaluation files.
-2. **Predictions CSV**: final `output.csv` for all rows in `dataset/messages.csv`.
-3. **Chat transcript**: the `log.txt` described above.
-
-Before submitting, confirm:
-
-- `output.csv` has one row per row in `dataset/messages.csv`.
-- `output.csv` has the exact required columns in the exact required order.
-- Your runnable code and setup instructions are included in `code.zip`.
+- `dataset/output.csv` in this repo was generated by the rules-only run (`python code/main.py`), the deterministic default.
+- `dataset/output_llm_used.csv` (if present) was generated with `--use-llm` enabled, for comparison — only a small subset of rows differ from the rules-only baseline due to the API call budget cap.
+- Re-running `python code/main.py` will regenerate `dataset/output.csv` identically every time (fully deterministic, no network calls).
